@@ -268,4 +268,4 @@ if __name__=="__main__":
     print(f"\n  DocVerify → http://127.0.0.1:{PORT}")
     print("  এই window বন্ধ করলে server বন্ধ হবে।\n")
     threading.Thread(target=open_browser,daemon=True).start()
-    app.run(host="127.0.0.1",port=PORT,debug=False)
+    app.run(host="0.0.0.0",port=int(os.environ.get("PORT",5555)),debug=False)
