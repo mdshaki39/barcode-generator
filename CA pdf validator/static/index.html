@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocVerify — CA DL AAMVA Tool</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--bg2:#1a1d27;--bg3:#22263a;--border:#2e3350;
+  --text:#e8eaf0;--text2:#8b91b0;--text3:#555c7a;
+  --blue:#4f7fff;--blue2:#1e3a8a;--green:#22c55e;--green2:#14532d;
+  --red:#ef4444;--red2:#7f1d1d;--yellow:#f59e0b;--yellow2:#78350f;
+  --radius:10px;--mono:'Courier New',monospace
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh}
+
+/* ── Layout ── */
+.shell{display:flex;flex-direction:column;min-height:100vh}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-brand{font-size:15px;font-weight:600;letter-spacing:-.3px}
+.topbar-brand span{color:var(--blue)}
+.topbar-tabs{display:flex;gap:4px}
+.tab-btn{padding:6px 18px;border-radius:6px;border:none;background:transparent;color:var(--text2);font-size:13px;cursor:pointer;transition:all .15s;font-family:inherit}
+.tab-btn:hover{background:var(--bg3);color:var(--text)}
+.tab-btn.active{background:var(--blue);color:#fff}
+.content{flex:1;padding:24px;overflow:auto}
+
+/* ── Cards ── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.card+.card{margin-top:16px}
+.card-title{font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.card-title::before{content:'';display:inline-block;width:3px;height:13px;background:var(--blue);border-radius:2px}
+
+/* ── Generator layout ── */
+.gen-wrap{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start}
+.fields-panel{}
+.preview-panel{position:sticky;top:0}
+
+/* ── Section headers ── */
+.sec{font-size:11px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.08em;padding:10px 0 8px;border-bottom:1px solid var(--border);margin-bottom:14px;margin-top:20px;display:flex;align-items:center;justify-content:space-between}
+.sec:first-of-type{margin-top:0}
+.sec-badge{font-size:10px;background:var(--bg3);color:var(--text3);padding:2px 7px;border-radius:4px;font-weight:400;letter-spacing:0;text-transform:none}
+
+/* ── Form elements ── */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.fld{margin-bottom:12px}
+.fld label{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);margin-bottom:5px;font-weight:500}
+.fld label .code{font-family:var(--mono);font-size:10px;color:var(--text3);background:var(--bg3);padding:1px 5px;border-radius:3px}
+.fld label .auto-tag{font-size:9px;background:var(--blue2);color:var(--blue);padding:1px 5px;border-radius:3px;font-weight:600}
+.fld label .req{color:var(--red);margin-left:2px}
+
+input[type=text],input[type=number],input[type=date],select,textarea{
+  width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:7px;
+  color:var(--text);font-size:13px;padding:7px 10px;font-family:inherit;
+  transition:border-color .15s;outline:none
+}
+input:focus,select:focus,textarea:focus{border-color:var(--blue)}
+input[readonly]{opacity:.55;cursor:not-allowed}
+input::placeholder{color:var(--text3)}
+select option{background:var(--bg2)}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;cursor:pointer;font-family:inherit;transition:all .15s;font-weight:500}
+.btn:hover{background:var(--border);color:#fff}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.primary:hover{opacity:.88}
+.btn.sm{padding:5px 11px;font-size:12px}
+.btn.danger{background:var(--red2);border-color:var(--red);color:var(--red)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+
+/* ── Preview panel ── */
+.preview-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center}
+.preview-empty{color:var(--text3);font-size:13px}
+.preview-empty svg{opacity:.25;margin-bottom:8px}
+.barcode-img{max-width:100%;border-radius:6px;border:1px solid var(--border)}
+.dl-badge{font-family:var(--mono);font-size:12px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:4px 10px;color:var(--text2)}
+.exp-info{font-size:11px;color:var(--text3)}
+.dl-actions{display:flex;gap:8px;width:100%}
+.dl-actions .btn{flex:1;justify-content:center;font-size:12px}
+.spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.no-pdf417-notice{font-size:11px;color:var(--yellow);background:var(--yellow2);border:1px solid var(--yellow);border-radius:6px;padding:6px 10px;margin-top:6px;text-align:left}
+
+/* ── Validator ── */
+.val-wrap{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.val-input-area textarea{min-height:160px;font-family:var(--mono);font-size:12px;line-height:1.6}
+.result-summary{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-top:16px}
+.result-head{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.status-pill{font-size:12px;font-weight:700;padding:3px 12px;border-radius:20px}
+.pill-valid{background:var(--green2);color:var(--green)}
+.pill-invalid{background:var(--red2);color:var(--red)}
+.pill-warning{background:var(--yellow2);color:var(--yellow)}
+.conf-bar{height:3px;background:var(--border)}
+.conf-fill{height:3px;transition:width .4s}
+.section-divider{padding:6px 16px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);background:var(--bg)}
+.check-row{display:flex;align-items:flex-start;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border);font-size:13px}
+.check-row:last-child{border-bottom:none}
+.chk-icon{font-size:15px;flex-shrink:0;margin-top:1px}
+.chk-name{flex:1;color:var(--text2)}
+.chk-detail{font-size:11px;color:var(--text3);margin-top:2px}
+.field-row-val{display:flex;align-items:baseline;gap:8px;padding:5px 16px;border-bottom:1px solid var(--border);font-size:12px}
+.field-row-val:last-child{border-bottom:none}
+.field-key{color:var(--text3);width:140px;flex-shrink:0}
+.field-val{color:var(--text);font-family:var(--mono);font-size:12px}
+.err-block{background:var(--red2);border-bottom:1px solid var(--red);padding:8px 16px}
+.err-block p{color:var(--red);font-size:12px;margin:2px 0}
+.warn-block{background:var(--yellow2);border-bottom:1px solid var(--yellow);padding:8px 16px}
+.warn-block p{color:var(--yellow);font-size:12px;margin:2px 0}
+.raw-preview{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:10px;font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.7;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow:auto;margin-top:10px}
+.sig-box{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:10px;min-height:110px;justify-content:center}
+.sig-img{max-width:100%;border-radius:4px}
+.sig-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.style-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.style-btn{padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:11px;cursor:pointer;text-align:center;transition:all .15s}
+.style-btn:hover,.style-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.slider-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);margin-bottom:8px}
+.slider-row input[type=range]{flex:1;height:3px;accent-color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="topbar-brand">Doc<span>Verify</span> <span style="color:var(--text3);font-weight:400;font-size:12px">CA DL · AAMVA v9 (2016 Standard)</span></div>
+    <div class="topbar-tabs">
+      <button class="tab-btn active" onclick="switchTab('generator')">⊞ Generator</button>
+      <button class="tab-btn" onclick="switchTab('validator')">⊡ Validator</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ═══════════════ GENERATOR ═══════════════ -->
+    <div id="tab-generator">
+      <div class="gen-wrap">
+
+        <!-- LEFT: All fields -->
+        <div class="fields-panel">
+
+          <!-- Top actions -->
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button class="btn primary" onclick="autoFill()">⚡ Auto-fill</button>
+            <button class="btn" onclick="clearAll()">↺ Clear all</button>
+          </div>
+
+          <!-- ── HEADER (auto) ── -->
+          <div class="sec">AAMVA Header <span class="sec-badge">auto-generated</span></div>
+          <div class="grid3">
+            <div class="fld">
+              <label><span class="code">IIN</span> Issuer ID</label>
+              <input type="text" id="f-iin" value="636014" readonly>
+            </div>
+            <div class="fld">
+              <label><span class="code">AAMVA Ver</span></label>
+              <input type="text" id="f-aamva" value="09" readonly>
+            </div>
+            <div class="fld">
+              <label><span class="code">Jur Ver</span></label>
+              <input type="text" id="f-jur" value="01" readonly>
+            </div>
+          </div>
+
+          <!-- ── DL NUMBER ── -->
+          <div class="sec">DL Number</div>
+          <div class="grid2">
+            <div class="fld">
+              <label><span class="code">DAQ</span> DL Number <span class="auto-tag">AUTO</span></label>
+              <input type="text" id="f-daq" placeholder="B1234567" maxlength="8" oninput="this.value=this.value.toUpperCase()">
+            </div>
+          </div>
+
+          <!-- ── NAME ── -->
+          <div class="sec">Name</div>
+          <div class="grid3">
+            <div class="fld">
+              <label><span class="code">DCS</span> Family Name <span class="req">*</span></label>
+              <input type="text" id="f-dcs" placeholder="SMITH" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="fld">
+              <label><span class="code">DAC</span> First Name <span class="req">*</span></label>
+              <input type="text" id="f-dac" placeholder="JOHN" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="fld">
+              <label><span class="code">DAD</span> Middle Name</label>
+              <input type="text" id="f-dad" placeholder="MICHAEL" oninput="this.value=this.value.toUpperCase()">
+            </div>
+          </div>
+          <div class="grid3">
+            <div class="fld">
+              <label><span class="code">DDE</span> Family Truncation <span class="auto-tag">AUTO</span></label>
+              <select id="f-dde"><option value="N">N – Not truncated</option><option value="T">T – Truncated</option><option value="U">U – Unknown</option></select>
+            </div>
+            <div class="fld">
+              <label><span class="code">DDF</span> First Truncation <span class="auto-tag">AUTO</span></label>
+              <select id="f-ddf"><option value="N">N – Not truncated</option><option value="T">T – Truncated</option><option value="U">U – Unknown</option></select>
+            </div>
+            <div class="fld">
+              <label><span class="code">DDG</span> Middle Truncation <span class="auto-tag">AUTO</span></label>
+              <select id="f-ddg"><option value="N">N – Not truncated</option><option value="T">T – Truncated</option><option value="U">U – Unknown</option></select>
+            </div>
+          </div>
+
+          <!-- ── LICENSE CLASS ── -->
+          <div class="sec">License Class <span class="sec-badge">auto-generated</span></div>
+          <div class="grid3">
+            <div class="fld">
+              <label><span class="code">DCA</span> Vehicle Class <span class="auto-tag">AUTO</span></label>
+              <select id="f-dca">
+                <option value="C">C – Noncommercial</option>
+                <option value="A">A – Commercial combo</option>
+                <option value="B">B – Commercial non-combo</option>
+                <option value="M">M – Motorcycle</option>
+              </select>
+            </div>
+            <div class="fld">
+              <label><span class="code">DCB</span> Restrictions <span class="auto-tag">AUTO</span></label>
+              <input type="text" id="f-dcb" value="NONE" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="fld">
+              <label><span class="code">DCD</span> Endorsements <span class="auto-tag">AUTO</span></label>
+              <input type="text" id="f-dcd" value="NONE" oninput="this.value=this.value.toUpperCase()">
+            </div>
+          </div>
+
+          <!-- ── DATES ── -->
+          <div class="sec">Dates</div>
+          <div class="grid2">
+            <div class="fld">
+              <label><span class="code">DBB</span> Date of Birth <span class="req">*</span></label>
+              <input type="date" id="f-dbb" onchange="onDobChange()">
+              <div id="dob-hint" style="font-size:11px;color:var(--blue);margin-top:4px;display:none"></div>
+            </div>
+            <div class="fld">
+              <label><span class="code">DBA</span> Expiry Date <span class="auto-tag">AUTO from Issue</span></label>
+              <input type="date" id="f-dba" onchange="updateDCF()">
+              <div style="font-size:10px;color:var(--text3);margin-top:3px">DOB month/day + Issue year + 5 · manually edit করা যাবে</div>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="fld">
+              <label><span class="code">DBD</span> Issue Date <span class="req">*</span></label>
+              <input type="date" id="f-dbd" onchange="onIssueDateChange()">
+            </div>
+            <div class="fld">
+              <label><span class="code">DDB</span> Card Revision Date <span class="auto-tag">AUTO</span></label>
+              <input type="date" id="f-ddb">
+            </div>
+          </div>
+
+          <!-- ── PHYSICAL ── -->
+          <div class="sec">Physical Description</div>
+          <div class="grid3">
+            <div class="fld">
+              <label><span class="code">DBC</span> Sex <span class="req">*</span></label>
+              <select id="f-dbc">
+                <option value="1">1 – Male</option>
+                <option value="2">2 – Female</option>
+                <option value="9">9 – Unspecified</option>
+              </select>
+            </div>
+            <div class="fld">
+              <label><span class="code">DAU</span> Height (inches) <span class="req">*</span></label>
+              <input type="number" id="f-dau" placeholder="68" min="48" max="96">
+            </div>
+            <div class="fld">
+              <label><span class="code">DAW</span> Weight (lbs)</label>
+              <input type="number" id="f-daw" placeholder="160" min="50" max="500">
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="fld">
+              <label><span class="code">DAY</span> Eye Color <span class="req">*</span></label>
+              <select id="f-day">
+                <option value="BRO">BRO – Brown</option>
+                <option value="BLU">BLU – Blue</option>
+                <option value="GRN">GRN – Green</option>
+                <option value="GRY">GRY – Gray</option>
+                <option value="HAZ">HAZ – Hazel</option>
+                <option value="BLK">BLK – Black</option>
+                <option value="MAR">MAR – Maroon</option>
+                <option value="UNK">UNK – Unknown</option>
+              </select>
+            </div>
+            <div class="fld">
+              <label><span class="code">DAZ</span> Hair Color</label>
+              <select id="f-daz">
+                <option value="BRO">BRO – Brown</option>
+                <option value="BLK">BLK – Black</option>
+                <option value="BLN">BLN – Blonde</option>
+                <option value="GRY">GRY – Gray</option>
+                <option value="RED">RED – Red</option>
+                <option value="SDY">SDY – Sandy</option>
+                <option value="WHI">WHI – White</option>
+                <option value="UNK">UNK – Unknown</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- ── ADDRESS ── -->
+          <div class="sec">Address</div>
+          <div class="fld">
+            <label><span class="code">DAG</span> Street Address <span class="req">*</span></label>
+            <input type="text" id="f-dag" placeholder="1508 CARLISLE AVE" oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <div class="grid3">
+            <div class="fld">
+              <label><span class="code">DAI</span> City <span class="req">*</span></label>
+              <input type="text" id="f-dai" placeholder="MODESTO" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="fld">
+              <label><span class="code">DAJ</span> State</label>
+              <input type="text" id="f-daj" value="CA" readonly>
+            </div>
+            <div class="fld">
+              <label><span class="code">DAK</span> ZIP (9 digits) <span class="req">*</span></label>
+              <input type="text" id="f-dak" placeholder="953540000" maxlength="9">
+            </div>
+          </div>
+          <div class="fld">
+            <label><span class="code">DCG</span> Country</label>
+            <input type="text" id="f-dcg" value="USA" readonly>
+          </div>
+
+          <!-- ── DOCUMENT META ── -->
+          <div class="sec">Document Metadata <span class="sec-badge">auto-generated</span></div>
+          <div class="fld">
+            <label><span class="code">DCF</span> Document Discriminator <span class="auto-tag">AUTO</span></label>
+            <input type="text" id="f-dcf" placeholder="Auto from expiry + inventory" readonly>
+            <div style="font-size:10px;color:var(--text3);margin-top:3px">Format: MM/DD/YYYY + inventory suffix</div>
+          </div>
+          <div class="grid2">
+            <div class="fld">
+              <label><span class="code">DCK</span> Inventory Control # <span class="auto-tag">AUTO</span></label>
+              <input type="text" id="f-dck" placeholder="20311B84189220401" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="fld">
+              <label><span class="code">DDA</span> REAL ID Compliance <span class="auto-tag">AUTO</span></label>
+              <select id="f-dda">
+                <option value="F">F – REAL ID Compliant</option>
+                <option value="N">N – Non-compliant</option>
+                <option value="T">T – Temporary</option>
+              </select>
+            </div>
+          </div>
+          <div class="fld">
+            <label><span class="code">DDK</span> Organ Donor</label>
+            <select id="f-ddk">
+              <option value="1">1 – Yes</option>
+              <option value="0">0 – No</option>
+            </select>
+          </div>
+
+          <!-- ── CA ZC SUBFILE ── -->
+          <div class="sec">California ZC Subfile</div>
+          <div class="grid2">
+            <div class="fld">
+              <label><span class="code">ZCA</span> CA Field A</label>
+              <input type="text" id="f-zca" value="BLK" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="fld">
+              <label><span class="code">ZCB</span> CA Field B</label>
+              <input type="text" id="f-zcb" value="BAL" oninput="this.value=this.value.toUpperCase()">
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="fld">
+              <label><span class="code">ZCC</span> CA Field C</label>
+              <input type="text" id="f-zcc" placeholder="(optional)" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="fld">
+              <label><span class="code">ZCD</span> CA Field D</label>
+              <input type="text" id="f-zcd" placeholder="(optional)" oninput="this.value=this.value.toUpperCase()">
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn primary" style="font-size:14px;padding:10px 24px" onclick="generateBarcode()">⊞ Generate Barcode</button>
+          </div>
+        </div>
+
+        <!-- RIGHT: Preview -->
+        <div class="preview-panel">
+          <div class="card">
+            <div class="card-title">Preview</div>
+            <div class="preview-box" id="preview-box">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="4" height="18"/><rect x="8" y="3" width="1" height="18"/><rect x="10" y="3" width="3" height="18"/><rect x="14" y="3" width="2" height="18"/><rect x="17" y="3" width="1" height="18"/><rect x="19" y="3" width="2" height="18"/></svg>
+              <div class="preview-empty">Fields fill করে Generate এ click করুন</div>
+            </div>
+          </div>
+          <div class="card" id="raw-card" style="display:none">
+            <div class="card-title">Raw Barcode String</div>
+            <div class="raw-preview" id="raw-preview"></div>
+            <div style="margin-top:8px;display:flex;gap:8px">
+              <button class="btn sm" onclick="copyRaw()">⊙ Copy</button>
+              <button class="btn sm" onclick="sendToValidator()">→ Validate</button>
+            </div>
+          </div>
+          <div class="card" id="code128-card" style="display:none">
+            <div class="card-title">Code 128 Barcode <span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:4px">DCK Inventory Control #</span></div>
+            <div id="code128-box" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px">
+              <img id="code128-img" style="max-width:100%;border-radius:4px;background:transparent" alt="Code128">
+              <div id="code128-val" style="font-family:var(--mono);font-size:11px;color:var(--text3)"></div>
+              <button class="btn sm" onclick="downloadCode128()">⬇ Download Code128 PNG</button>
+            </div>
+          </div>
+        </div>
+          <div class="card" id="sig-card">
+            <div class="card-title">✍ Signature Generator</div>
+            <div class="fld">
+              <label>Full Name <span class="req">*</span></label>
+              <input type="text" id="sig-name" placeholder="JONDEL DAVIS" oninput="this.value=this.value.toUpperCase()">
+              <div style="font-size:10px;color:var(--text3);margin-top:3px">Middle name auto-excluded · প্রতিবার unique signature · Boldness slider দিয়ে stroke মোটা/পাতলা করুন</div>
+            </div>
+            <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Style (auto-random on each generate)</div>
+            <div class="style-grid">
+              <button class="style-btn active" onclick="setSigStyle(this,'Executive')">Executive</button>
+              <button class="style-btn" onclick="setSigStyle(this,'Fast Scribble')">Fast Scribble</button>
+              <button class="style-btn" onclick="setSigStyle(this,'Elegant Legal')">Elegant Legal</button>
+              <button class="style-btn" onclick="setSigStyle(this,'Doctor Style')">Doctor Style</button>
+              <button class="style-btn" onclick="setSigStyle(this,'Minimal Initial')">Minimal Initial</button>
+              <button class="style-btn" onclick="setSigStyle(this,'Heavy Cursive')">Heavy Cursive</button>
+              <button class="style-btn" onclick="setSigStyle(this,'Clear Print')" style="grid-column:1/-1">Clear Print (সম্পূর্ণ পাঠযোগ্য)</button>
+            </div>
+            <div class="slider-row">
+              <span style="width:82px">Randomness</span>
+              <input type="range" id="sig-random" min="0" max="100" value="55" oninput="document.getElementById('sig-random-val').textContent=this.value;debouncedSigRegen()">
+              <span id="sig-random-val" style="width:26px;text-align:right">55</span>
+            </div>
+            <div class="slider-row">
+              <span style="width:82px">Boldness</span>
+              <input type="range" id="sig-intensity" min="0" max="100" value="45" oninput="document.getElementById('sig-intensity-val').textContent=this.value;debouncedSigRegen()">
+              <span id="sig-intensity-val" style="width:26px;text-align:right">45</span>
+            </div>
+            <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:12px">
+              <input type="checkbox" id="sig-paper" onchange="debouncedSigRegen()"> Paper texture
+            </label>
+            <button class="btn primary" style="width:100%;justify-content:center" onclick="generateSignature()">✍ Generate Signature</button>
+            <div id="sig-result" style="display:none;margin-top:12px">
+              <div class="sig-box"><img id="sig-img" class="sig-img" alt="Signature"></div>
+              <div class="sig-actions" style="margin-top:8px">
+                <button class="btn sm" onclick="downloadSig('png')">⬇ PNG</button>
+                <button class="btn sm" onclick="downloadSig('transparent')">⬇ Transparent PNG</button>
+                <button class="btn sm primary" onclick="generateSignature()">↺ Regenerate</button>
+              </div>
+            </div>
+          </div>
+
+      </div>
+    </div>
+
+    <!-- ═══════════════ VALIDATOR ═══════════════ -->
+    <div id="tab-validator" style="display:none">
+      <div class="val-wrap">
+        <div>
+          <div class="card">
+            <div class="card-title">PDF417 Barcode String</div>
+            <div class="fld">
+              <textarea id="val-input" placeholder="@&#10;\x1e\rANSI 636014...&#10;&#10;Barcode string এখানে paste করুন অথবা Generator থেকে পাঠান"></textarea>
+            </div>
+            <div class="btn-row">
+              <button class="btn primary" onclick="runValidate()">⊡ Validate</button>
+              <button class="btn" onclick="document.getElementById('val-input').value='';document.getElementById('val-output').innerHTML=''">↺ Clear</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div id="val-output"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Tab switching ──
+function switchTab(t){
+  document.getElementById('tab-generator').style.display=t==='generator'?'':'none';
+  document.getElementById('tab-validator').style.display=t==='validator'?'':'none';
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
+    b.classList.toggle('active',(i===0&&t==='generator')||(i===1&&t==='validator'));
+  });
+}
+
+// ── DOB change → update age hint + recalculate expiry ──
+function onDobChange(){
+  const dobStr=document.getElementById('f-dbb').value;
+  if(!dobStr)return;
+  const hint=document.getElementById('dob-hint');
+  hint.style.display='block';
+  const dob=parseDateParts(dobStr);
+  const age=new Date().getFullYear()-dob.y;
+  hint.textContent=`Age ≈ ${age} yrs`;
+  // Recalculate expiry if issue date already set
+  const iss=document.getElementById('f-dbd').value;
+  if(iss) onIssueDateChange();
+}
+// ── Issue Date + DOB → Expiry ──
+// CA logic: Expiry = DOB month & day + (Issue year + 5)
+// e.g. DOB=11/04/1980, Issue=11/06/2020 → Expiry=11/04/2025
+// NOTE: parse date parts as integers to avoid JS timezone off-by-one bug
+function parseDateParts(str){
+  // str = "YYYY-MM-DD"
+  const [y,m,d]=str.split('-').map(Number);
+  return {y,m,d};
+}
+function onIssueDateChange(){
+  const issStr=document.getElementById('f-dbd').value;
+  const dobStr=document.getElementById('f-dbb').value;
+  if(!issStr)return;
+  const iss=parseDateParts(issStr);
+  const expiryYear=iss.y+5;
+  let mm,dd;
+  if(dobStr){
+    // Use DOB month and day exactly — parse as integers, no Date() constructor
+    const dob=parseDateParts(dobStr);
+    mm=String(dob.m).padStart(2,'0');
+    dd=String(dob.d).padStart(2,'0');
+  } else {
+    mm=String(iss.m).padStart(2,'0');
+    dd=String(iss.d).padStart(2,'0');
+  }
+  const exp=`${expiryYear}-${mm}-${dd}`;
+  document.getElementById('f-dba').value=exp;
+  updateDCF();
+}
+function updateDCF(){
+  const exp=document.getElementById('f-dba').value;
+  const dck=document.getElementById('f-dck').value;
+  if(!exp||!dck)return;
+  const [y,m,d]=exp.split('-');
+  document.getElementById('f-dcf').value=`${m}/${d}/${y}${dck.substring(0,13)}`;
+}
+
+// ── Auto-fill ──
+async function autoFill(){
+  const r=await fetch('/api/autofill');
+  const d=await r.json();
+  document.getElementById('f-daq').value=d.dl_number;
+  document.getElementById('f-dcs').value=d.family_name;
+  document.getElementById('f-dac').value=d.first_name;
+  document.getElementById('f-dad').value=d.middle_name;
+  document.getElementById('f-dde').value=d.dde;
+  document.getElementById('f-ddf').value=d.ddf;
+  document.getElementById('f-ddg').value=d.ddg;
+  document.getElementById('f-dca').value=d.vehicle_class;
+  document.getElementById('f-dcb').value=d.restrictions;
+  document.getElementById('f-dcd').value=d.endorsements;
+  document.getElementById('f-dbb').value=d.dob;
+  document.getElementById('f-dbd').value=d.issue_date;
+  document.getElementById('f-dba').value=d.expiry_date;
+  document.getElementById('f-ddb').value=d.card_revision;
+  document.getElementById('f-dbc').value=d.sex;
+  document.getElementById('f-dau').value=d.height_in;
+  document.getElementById('f-daw').value=d.weight_lbs;
+  document.getElementById('f-day').value=d.eye_color;
+  document.getElementById('f-daz').value=d.hair_color;
+  document.getElementById('f-dag').value=d.street;
+  document.getElementById('f-dai').value=d.city;
+  document.getElementById('f-dak').value=d.zip_code;
+  document.getElementById('f-dck').value=d.inventory_ctrl;
+  document.getElementById('f-dda').value=d.compliance;
+  document.getElementById('f-ddk').value='1';
+  document.getElementById('f-dcf').value=d.dcf;
+  onDobChange();
+  onIssueDateChange();
+  autoFillSigName();
+}
+
+function clearAll(){
+  ['f-daq','f-dcs','f-dac','f-dad','f-dbb','f-dbd','f-dba','f-ddb','f-dau','f-daw','f-dag','f-dai','f-dak','f-dck','f-dcf'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+  document.getElementById('f-dbc').value='1';
+  document.getElementById('f-day').value='BRO';
+  document.getElementById('f-daz').value='BRO';
+  document.getElementById('f-dca').value='C';
+  document.getElementById('f-dcb').value='NONE';
+  document.getElementById('f-dcd').value='NONE';
+  document.getElementById('f-dde').value='N';
+  document.getElementById('f-ddf').value='N';
+  document.getElementById('f-ddg').value='N';
+  document.getElementById('f-dda').value='F';
+  document.getElementById('f-ddk').value='1';
+  document.getElementById('f-zca').value='BLK';
+  document.getElementById('f-zcb').value='BAL';
+  document.getElementById('f-zcc').value='';
+  document.getElementById('f-zcd').value='';
+  document.getElementById('dob-hint').style.display='none';
+  document.getElementById('preview-box').innerHTML='<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.2"><rect x="3" y="3" width="4" height="18"/><rect x="8" y="3" width="1" height="18"/><rect x="10" y="3" width="3" height="18"/><rect x="14" y="3" width="2" height="18"/><rect x="17" y="1" width="1" height="18"/><rect x="19" y="3" width="2" height="18"/></svg><div class="preview-empty">Fields fill করে Generate এ click করুন</div>';
+  document.getElementById('raw-card').style.display='none';
+  document.getElementById('code128-card').style.display='none';
+}
+
+// ── Generate ──
+async function generateBarcode(){
+  const required=[['f-dcs','Family Name'],['f-dac','First Name'],['f-dbb','Date of Birth'],['f-dbd','Issue Date'],['f-dag','Street'],['f-dai','City'],['f-dak','ZIP']];
+  for(const [id,name] of required){
+    if(!document.getElementById(id).value.trim()){
+      alert(`"${name}" field আবশ্যক`);
+      document.getElementById(id).focus();
+      return;
+    }
+  }
+  const box=document.getElementById('preview-box');
+  box.innerHTML='<div class="spinner"></div><div style="color:var(--text3);font-size:12px;margin-top:8px">Generating...</div>';
+
+  const dck=document.getElementById('f-dck').value||randInvCtrl();
+  const daq=document.getElementById('f-daq').value||randDLNum();
+  if(!document.getElementById('f-dck').value) document.getElementById('f-dck').value=dck;
+  if(!document.getElementById('f-daq').value) document.getElementById('f-daq').value=daq;
+  updateDCF();
+
+  const payload={
+    dl_number:      daq,
+    family_name:    document.getElementById('f-dcs').value.trim().toUpperCase(),
+    first_name:     document.getElementById('f-dac').value.trim().toUpperCase(),
+    middle_name:    document.getElementById('f-dad').value.trim().toUpperCase()||'NONE',
+    dde:            document.getElementById('f-dde').value,
+    ddf:            document.getElementById('f-ddf').value,
+    ddg:            document.getElementById('f-ddg').value,
+    vehicle_class:  document.getElementById('f-dca').value,
+    restrictions:   document.getElementById('f-dcb').value.trim().toUpperCase()||'NONE',
+    endorsements:   document.getElementById('f-dcd').value.trim().toUpperCase()||'NONE',
+    dob:            document.getElementById('f-dbb').value,
+    issue_date:     document.getElementById('f-dbd').value,
+    expiry_date:    document.getElementById('f-dba').value,
+    card_revision:  document.getElementById('f-ddb').value||document.getElementById('f-dbd').value,
+    sex:            document.getElementById('f-dbc').value,
+    height_in:      parseInt(document.getElementById('f-dau').value)||68,
+    weight_lbs:     parseInt(document.getElementById('f-daw').value)||160,
+    eye_color:      document.getElementById('f-day').value,
+    hair_color:     document.getElementById('f-daz').value,
+    street:         document.getElementById('f-dag').value.trim().toUpperCase(),
+    city:           document.getElementById('f-dai').value.trim().toUpperCase(),
+    zip_code:       document.getElementById('f-dak').value.trim(),
+    compliance:     document.getElementById('f-dda').value,
+    organ_donor:    document.getElementById('f-ddk').value,
+    inventory_ctrl: dck,
+    zca:            document.getElementById('f-zca').value.toUpperCase(),
+    zcb:            document.getElementById('f-zcb').value.toUpperCase(),
+    zcc:            document.getElementById('f-zcc').value.toUpperCase(),
+    zcd:            document.getElementById('f-zcd').value.toUpperCase(),
+  };
+
+  try{
+    const r=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+    if(d.error){box.innerHTML=`<div style="color:var(--red);font-size:13px">Error: ${d.error}</div>`;return;}
+
+    window._lastRaw=d.barcode_str;
+    window._lastDL=d.dl_number;
+
+    if(d.png_b64){
+      window._lastPngB64Transparent = 'data:image/png;base64,'+d.png_b64;
+      box.innerHTML=`
+        <img class="barcode-img" src="data:image/png;base64,${d.png_b64}" alt="PDF417" style="background:transparent">
+        <div class="dl-badge">DL# ${d.dl_number}</div>
+        <div class="exp-info">Expires: ${d.expiry} · REAL ID: ${payload.compliance==='F'?'✓ Yes':'No'}</div>
+        <div class="dl-actions">
+          <button class="btn sm" onclick="downloadPNG('${d.dl_number}')">⬇ Download PNG</button>
+          <button class="btn sm" onclick="sendToValidator()">→ Validate</button>
+        </div>`;
+    } else {
+      box.innerHTML=`
+        <div style="color:var(--yellow);font-size:13px;margin-bottom:6px">⚠ Barcode generated</div>
+        <div class="no-pdf417-notice">pdf417gen not installed.<br>pip install pdf417gen</div>
+        <div class="dl-badge">DL# ${d.dl_number}</div>
+        <div class="dl-actions">
+          <button class="btn sm" onclick="sendToValidator()">→ Validate</button>
+        </div>`;
+    }
+    // show raw
+    document.getElementById('raw-card').style.display='';
+    document.getElementById('raw-preview').textContent=d.barcode_str
+      .replace(/\n/g,'\\n\n').replace(/\r/g,'\\r\n').replace(/\x1e/g,'\\x1e');
+    // show code128
+    if(d.code128_b64){
+      document.getElementById('code128-card').style.display='';
+      document.getElementById('code128-img').src='data:image/png;base64,'+d.code128_b64;
+      document.getElementById('code128-val').textContent='DCK: '+payload.inventory_ctrl;
+      window._lastCode128B64=d.code128_b64;
+      window._lastDCK=payload.inventory_ctrl;
+    }
+  } catch(e){
+    box.innerHTML=`<div style="color:var(--red);font-size:13px">Error: ${e.message}</div>`;
+  }
+}
+
+function downloadPNG(dlNum){
+  // Download transparent PNG stored in window._lastPngB64Transparent or fallback to preview img
+  const b64 = window._lastPngB64Transparent || (document.querySelector('#preview-box img')||{}).src;
+  if(!b64) return;
+  const a=document.createElement('a');
+  a.href = b64.startsWith('data:') ? b64 : 'data:image/png;base64,'+b64;
+  a.download=`ca_dl_${dlNum}.png`;
+  a.click();
+}
+function copyRaw(){
+  if(!window._lastRaw)return;
+  navigator.clipboard.writeText(window._lastRaw).then(()=>alert('Copied!')).catch(()=>{
+    const t=document.createElement('textarea');t.value=window._lastRaw;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);alert('Copied!');
+  });
+}
+function sendToValidator(){
+  if(!window._lastRaw)return;
+  document.getElementById('val-input').value=window._lastRaw;
+  switchTab('validator');
+  runValidate();
+}
+
+// ── Validator ──
+async function runValidate(){
+  const raw=document.getElementById('val-input').value.trim();
+  if(!raw){alert('Barcode string paste করুন');return;}
+  const r=await fetch('/api/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({barcode:raw})});
+  const d=await r.json();
+  renderResult(d);
+}
+
+function renderResult(d){
+  const el=document.getElementById('val-output');
+  const sc=d.status==='VALID'?'pill-valid':d.status==='WARNING'?'pill-warning':'pill-invalid';
+  const barColor=d.status==='VALID'?'#22c55e':d.status==='WARNING'?'#f59e0b':'#ef4444';
+
+  const errHtml=d.errors&&d.errors.length?`<div class="err-block">${d.errors.map(e=>`<p>✗ ${e}</p>`).join('')}</div>`:'';
+  const warnHtml=d.warnings&&d.warnings.length?`<div class="warn-block">${d.warnings.map(w=>`<p>⚠ ${w}</p>`).join('')}</div>`:'';
+
+  const fieldsHtml=Object.entries(d.extracted||{}).map(([k,v])=>`
+    <div class="field-row-val">
+      <span class="field-key">${k}</span>
+      <span class="field-val">${v}</span>
+    </div>`).join('');
+
+  const checksHtml=(d.checks||[]).map(c=>`
+    <div class="check-row">
+      <span class="chk-icon">${c.passed?'<span style="color:#22c55e">✓</span>':'<span style="color:#ef4444">✗</span>'}</span>
+      <div><div class="chk-name">${c.name}</div><div class="chk-detail">${c.detail}</div></div>
+    </div>`).join('');
+
+  el.innerHTML=`<div class="result-summary">
+    <div class="result-head">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="status-pill ${sc}">${d.status}</span>
+        <span style="font-size:12px;color:var(--text3)">CA: ${d.is_california?'✓':'✗'} · Expired: ${d.is_expired?'✓':'✗'}</span>
+      </div>
+      <span style="font-size:13px;color:var(--text2)">${d.confidence}% confidence</span>
+    </div>
+    <div class="conf-bar"><div class="conf-fill" style="width:${d.confidence}%;background:${barColor}"></div></div>
+    ${errHtml}${warnHtml}
+    ${fieldsHtml?`<div class="section-divider">Extracted Fields</div>${fieldsHtml}`:''}
+    <div class="section-divider">Format Checks</div>
+    ${checksHtml}
+  </div>`;
+}
+
+function downloadCode128(){
+  if(!window._lastCode128B64)return;
+  const a=document.createElement('a');
+  a.href='data:image/png;base64,'+window._lastCode128B64;
+  a.download='code128_'+(window._lastDCK||'dck')+'.png';
+  a.click();
+}
+
+// ── Helpers ──
+function randDLNum(){const l='ABCDEFGHJKLMNPRSTUVWXY';return l[Math.floor(Math.random()*l.length)]+Array.from({length:7},()=>Math.floor(Math.random()*10)).join('');}
+function randInvCtrl(){
+  const d5  = Array.from({length:5},  ()=>'0123456789'[Math.floor(Math.random()*10)]).join('');
+  const l1  = 'ABCDEFGHJKLMNPRSTUVWXY'[Math.floor(Math.random()*22)];
+  const d11 = Array.from({length:11}, ()=>'0123456789'[Math.floor(Math.random()*10)]).join('');
+  return d5+l1+d11;
+}
+
+// ── Signature ──────────────────────────────────────
+let _sigStyle='Executive', _sigPngB64=null, _sigTransB64=null;
+let _sigRegenTimer=null;
+
+function setSigStyle(btn, style){
+  document.querySelectorAll('.style-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  _sigStyle = style;
+  if(_sigPngB64) debouncedSigRegen();
+}
+
+// Live update: debounce 350ms so slider drag feels smooth
+function debouncedSigRegen(){
+  if(!_sigPngB64) return; // only regen if already generated once
+  clearTimeout(_sigRegenTimer);
+  const img = document.getElementById('sig-img');
+  if(img) img.style.opacity = '0.4';
+  _sigRegenTimer = setTimeout(() => generateSignature(true), 350);
+}
+
+function autoFillSigName(){
+  const first  = (document.getElementById('f-dac')||{}).value||'';
+  const family = (document.getElementById('f-dcs')||{}).value||'';
+  const el     = document.getElementById('sig-name');
+  if(el && !el.value && (first||family))
+    el.value = (first+' '+family).trim().toUpperCase();
+}
+
+async function generateSignature(isLive){
+  const name = (document.getElementById('sig-name')||{value:''}).value.trim();
+  if(!name){ if(!isLive) alert('Name আবশ্যক'); return; }
+  const randomness = parseInt((document.getElementById('sig-random')||{value:55}).value) / 100;
+  const intensity  = parseInt((document.getElementById('sig-intensity')||{value:45}).value) / 100;
+  const paper      = !!(document.getElementById('sig-paper')||{}).checked;
+  const btn = document.querySelector('#sig-card .btn.primary');
+  const orig = btn ? btn.textContent : '';
+  if(btn && !isLive){ btn.textContent='Generating...'; btn.disabled=true; }
+  try {
+    const r = await fetch('/api/signature', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, style:_sigStyle, randomness, intensity, paper_texture:paper})
+    });
+    const d = await r.json();
+    if(d.error){ if(!isLive) alert('Error: '+d.error); return; }
+    _sigPngB64  = d.png_b64;
+    _sigTransB64 = d.transparent_png_b64;
+    const imgEl = document.getElementById('sig-img');
+    if(imgEl){ imgEl.src='data:image/png;base64,'+d.png_b64; imgEl.style.opacity='1'; }
+    document.getElementById('sig-result').style.display='';
+  } catch(e){
+    if(!isLive) alert('Error: '+e.message);
+    const imgEl = document.getElementById('sig-img');
+    if(imgEl) imgEl.style.opacity='1';
+  } finally {
+    if(btn && !isLive){ btn.textContent=orig; btn.disabled=false; }
+    const imgEl = document.getElementById('sig-img');
+    if(imgEl) imgEl.style.opacity='1';
+  }
+}
+
+function downloadSig(type){
+  const b64 = type==='transparent' ? _sigTransB64 : _sigPngB64;
+  if(!b64) return;
+  const a = document.createElement('a');
+  a.href = 'data:image/png;base64,'+b64;
+  a.download = type==='transparent' ? 'signature_transparent.png' : 'signature.png';
+  a.click();
+}
+</script>
